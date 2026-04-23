@@ -5,20 +5,18 @@ A distributed market data analytics system that ingests real-time crypto trade f
 ## Architecture
 
 ```
-┌─────────────┐   ┌──────────────┐
-│ Binance     │   │ Coinbase     │
-│ ingester    │   │ ingester     │
-└──────┬──────┘   └──────┬───────┘
-       └────────┬─────────┘
-                ▼
-          ┌───────────┐
-          │   Redis   │
-          │  Streams  │
-          └─────┬─────┘
-                ▼
-   ┌─ detector worker 1 ─┐
-   ├─ detector worker 2 ─┼──▶ alerts stream ──▶ aggregator ──▶ Grafana / stdout
-   └─ detector worker 3 ─┘
+┌──────────────────┐
+│ Binance ingester │   (additional exchanges: implement ExchangeAdapter, add one compose service)
+└────────┬─────────┘
+         ▼
+   ┌───────────┐
+   │   Redis   │
+   │  Streams  │
+   └─────┬─────┘
+         ▼
+┌─ detector worker 1 ─┐
+├─ detector worker 2 ─┼──▶ alerts stream ──▶ aggregator ──▶ Grafana / stdout
+└─ detector worker 3 ─┘
 ```
 
 **Detectors:** Volume Spike · Order Flow Imbalance · Correlation Breakdown
