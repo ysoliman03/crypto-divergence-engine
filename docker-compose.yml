@@ -8,3 +8,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  ingester-binance:
+    build:
+      context: .
+      args:
+        CMD: ingester-binance
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_ADDR: redis:6379
+      SYMBOLS: BTC-USDT,ETH-USDT,SOL-USDT
+    restart: unless-stopped
