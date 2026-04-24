@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/youssef/divergence-engine/internal/alert"
 	"github.com/youssef/divergence-engine/internal/tick"
 )
 
@@ -24,6 +25,20 @@ func Publish(ctx context.Context, rdb *redis.Client, stream string, t tick.Tick)
 	return rdb.XAdd(ctx, &redis.XAddArgs{
 		Stream: stream,
 		MaxLen: 100_000,
+		Approx: true,
+		Values: map[string]any{"data": string(data)},
+	}).Err()
+}
+
+// PublishAlert serializes a to JSON and appends it to the alerts stream.
+func PublishAlert(ctx context.Context, rdb *redis.Client, a alert.Alert) error {
+	data, err := json.Marshal(a)
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+	return rdb.XAdd(ctx, &redis.XAddArgs{
+		Stream: StreamAlerts,
+		MaxLen: 10_000,
 		Approx: true,
 		Values: map[string]any{"data": string(data)},
 	}).Err()

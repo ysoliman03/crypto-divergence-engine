@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/youssef/divergence-engine/internal/alert"
 	"github.com/youssef/divergence-engine/internal/bus"
 	"github.com/youssef/divergence-engine/internal/tick"
 )
@@ -27,13 +28,16 @@ func main() {
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
 	defer rdb.Close()
 
-	log.Printf("listening on stream %q — waiting for ticks (Ctrl+C to stop)...", bus.StreamTicks)
+	log.Printf("listening on streams %q and %q (Ctrl+C to stop)...", bus.StreamTicks, bus.StreamAlerts)
 
-	lastID := "$" // only show ticks that arrive after we start
+	ticksID := "$"
+	alertsID := "$"
+
 	for {
+		// XREAD supports multiple streams in one blocking call.
 		streams, err := rdb.XRead(ctx, &redis.XReadArgs{
-			Streams: []string{bus.StreamTicks, lastID},
-			Block:   0, // block until at least one message arrives
+			Streams: []string{bus.StreamTicks, bus.StreamAlerts, ticksID, alertsID},
+			Block:   0,
 			Count:   100,
 		}).Result()
 		if err != nil {
@@ -46,30 +50,43 @@ func main() {
 
 		for _, stream := range streams {
 			for _, msg := range stream.Messages {
-				lastID = msg.ID
-
-				data, ok := msg.Values["data"].(string)
-				if !ok {
-					continue
+				switch stream.Stream {
+				case bus.StreamTicks:
+					ticksID = msg.ID
+					printTick(msg)
+				case bus.StreamAlerts:
+					alertsID = msg.ID
+					printAlert(msg)
 				}
-
-				var t tick.Tick
-				if err := json.Unmarshal([]byte(data), &t); err != nil {
-					log.Printf("unmarshal: %v", err)
-					continue
-				}
-
-				lag := t.ReceivedAt.Sub(t.Timestamp).Round(time.Millisecond)
-				fmt.Printf("[%s] %s  %-10s  price=%-12.2f  vol=%.6f  side=%s  lag=%s\n",
-					t.Exchange,
-					t.Timestamp.Format("15:04:05.000"),
-					t.Symbol,
-					t.Price,
-					t.Volume,
-					t.Side,
-					lag,
-				)
 			}
 		}
 	}
+}
+
+func printTick(msg redis.XMessage) {
+	data, ok := msg.Values["data"].(string)
+	if !ok {
+		return
+	}
+	var t tick.Tick
+	if err := json.Unmarshal([]byte(data), &t); err != nil {
+		return
+	}
+	lag := t.ReceivedAt.Sub(t.Timestamp).Round(time.Millisecond)
+	fmt.Printf("TICK   [%s] %s  %-10s  price=%-12.2f  vol=%.6f  side=%s  lag=%s\n",
+		t.Exchange, t.Timestamp.Format("15:04:05.000"), t.Symbol,
+		t.Price, t.Volume, t.Side, lag)
+}
+
+func printAlert(msg redis.XMessage) {
+	data, ok := msg.Values["data"].(string)
+	if !ok {
+		return
+	}
+	var a alert.Alert
+	if err := json.Unmarshal([]byte(data), &a); err != nil {
+		return
+	}
+	fmt.Printf("ALERT  [%s] %-10s  detector=%s  %s  (val=%.4f threshold=%.4f)\n",
+		a.Severity, a.Symbol, a.Detector, a.Message, a.Value, a.Threshold)
 }

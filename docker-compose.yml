@@ -21,3 +21,15 @@ services:
       REDIS_ADDR: redis:6379
       SYMBOLS: BTC-USDT,ETH-USDT,SOL-USDT
     restart: unless-stopped
+
+  detector:
+    build:
+      context: .
+      args:
+        CMD: detector
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_ADDR: redis:6379
+    restart: unless-stopped
