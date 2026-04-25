@@ -10,9 +10,22 @@ import (
 	"github.com/youssef/divergence-engine/internal/tick"
 )
 
+const (
+	// minHistory is how long we collect data before trusting the baseline.
+	// Without this, the long window is nearly empty at startup and the ratio
+	// is always enormous, causing false alerts on every tick.
+	minHistory = 5 * time.Minute
+
+	// alertCooldown prevents the same alert firing on every tick once triggered.
+	// Deduplication is the aggregator's job (Phase 6); this just keeps the output readable.
+	alertCooldown = 30 * time.Second
+)
+
 type vsState struct {
-	short *state.RingBuffer // rolling window for current rate
-	long  *state.RingBuffer // rolling window for baseline rate
+	short     *state.RingBuffer
+	long      *state.RingBuffer
+	firstSeen time.Time // when we first saw a tick for this symbol
+	lastAlert time.Time // when we last fired an alert for this symbol
 }
 
 // VolumeSpikeDetector alerts when the per-second trade volume over the last
@@ -45,22 +58,29 @@ func (d *VolumeSpikeDetector) OnTick(ctx context.Context, t tick.Tick) []alert.A
 			}
 		},
 		func(s *vsState) {
+			if s.firstSeen.IsZero() {
+				s.firstSeen = t.Timestamp
+			}
 			s.short.Push(t.Timestamp, t.Volume)
 			s.long.Push(t.Timestamp, t.Volume)
 
-			shortVol := s.short.SumSince(t.Timestamp, d.shortWindow)
-			longVol := s.long.SumSince(t.Timestamp, d.longWindow)
-
-			if longVol == 0 {
-				return // not enough history yet
+			// Wait until we have enough history to compute a meaningful baseline.
+			if t.Timestamp.Sub(s.firstSeen) < minHistory {
+				return
 			}
 
-			// Compare per-second rates to normalize the different window lengths.
+			shortVol := s.short.SumSince(t.Timestamp, d.shortWindow)
+			longVol := s.long.SumSince(t.Timestamp, d.longWindow)
+			if longVol == 0 {
+				return
+			}
+
 			shortRate := shortVol / d.shortWindow.Seconds()
 			longRate := longVol / d.longWindow.Seconds()
 			threshold := longRate * d.multiplier
 
-			if shortRate > threshold {
+			if shortRate > threshold && t.Timestamp.Sub(s.lastAlert) >= alertCooldown {
+				s.lastAlert = t.Timestamp
 				result = append(result, alert.Alert{
 					Detector:  d.Name(),
 					Symbol:    t.Symbol,

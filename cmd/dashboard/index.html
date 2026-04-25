@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Divergence Engine</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: 'Courier New', monospace;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+}
+
+.logo { font-size: 13px; font-weight: bold; color: #58a6ff; letter-spacing: 2px; }
+
+.header-stats { display: flex; gap: 24px; font-size: 12px; color: #8b949e; }
+.header-stats span { color: #e6edf3; }
+
+.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8b949e; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; animation: pulse 2s infinite; }
+.dot.off { background: #f85149; animation: none; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: 16px;
+  gap: 16px;
+}
+
+/* ── Price cards ── */
+.prices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.price-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 16px;
+  transition: border-color 0.2s;
+}
+.price-card.flash-buy  { border-color: #3fb950; }
+.price-card.flash-sell { border-color: #f85149; }
+
+.card-symbol { font-size: 11px; color: #8b949e; letter-spacing: 1px; margin-bottom: 8px; }
+
+.card-price {
+  font-size: 26px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  transition: color 0.15s;
+}
+.card-price.buy  { color: #3fb950; }
+.card-price.sell { color: #f85149; }
+.card-price.neutral { color: #e6edf3; }
+
+.card-meta { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; }
+
+.side-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+.side-badge.buy  { background: rgba(63,185,80,.15); color: #3fb950; }
+.side-badge.sell { background: rgba(248,81,73,.15);  color: #f85149; }
+
+/* ── Alert feed ── */
+.alerts-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.section-title {
+  font-size: 11px; color: #8b949e; letter-spacing: 1px;
+  text-transform: uppercase; margin-bottom: 8px; flex-shrink: 0;
+}
+
+.alerts-feed {
+  flex: 1; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.alerts-feed::-webkit-scrollbar { width: 4px; }
+.alerts-feed::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+.alert-row {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 8px 12px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-left: 3px solid #d29922;
+  border-radius: 4px;
+  font-size: 12px;
+  flex-shrink: 0;
+  animation: slideIn .2s ease;
+}
+.alert-row.critical { border-left-color: #f85149; }
+.alert-row.warning  { border-left-color: #d29922; }
+.alert-row.info     { border-left-color: #58a6ff; }
+
+@keyframes slideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+.alert-time     { color: #8b949e; flex-shrink: 0; }
+.alert-symbol   { color: #58a6ff; font-weight: bold; flex-shrink: 0; min-width: 90px; }
+.alert-detector { color: #8b949e; flex-shrink: 0; min-width: 180px; }
+.alert-msg      { color: #e6edf3; flex: 1; }
+
+.empty { color: #8b949e; font-size: 12px; padding: 20px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">◆ DIVERGENCE ENGINE</div>
+  <div class="header-stats">
+    <div>ticks/sec &nbsp;<span id="tps">—</span></div>
+    <div>alerts &nbsp;<span id="alert-count">0</span></div>
+  </div>
+  <div class="status">
+    <div class="dot off" id="dot"></div>
+    <span id="status-text">connecting…</span>
+  </div>
+</header>
+
+<main>
+  <div class="prices" id="prices"></div>
+
+  <div class="alerts-section">
+    <div class="section-title">Alert Feed</div>
+    <div class="alerts-feed" id="feed">
+      <div class="empty" id="empty">No alerts yet — detectors are warming up…</div>
+    </div>
+  </div>
+</main>
+
+<script>
+let tickCount = 0, lastTickCount = 0, alertCount = 0;
+
+setInterval(() => {
+  document.getElementById('tps').textContent = tickCount - lastTickCount;
+  lastTickCount = tickCount;
+}, 1000);
+
+function sym(s) { return s.replace('-', ''); }
+
+function getCard(symbol) {
+  let card = document.getElementById('card-' + sym(symbol));
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'price-card';
+    card.id = 'card-' + sym(symbol);
+    card.innerHTML = `
+      <div class="card-symbol">${symbol}</div>
+      <div class="card-price neutral" id="p-${sym(symbol)}">—</div>
+      <div class="card-meta">
+        <span id="v-${sym(symbol)}">vol —</span>
+        <span class="side-badge" id="s-${sym(symbol)}">—</span>
+      </div>`;
+    document.getElementById('prices').appendChild(card);
+  }
+  return card;
+}
+
+function onTick(t) {
+  tickCount++;
+  const card = getCard(t.symbol);
+  const id = sym(t.symbol);
+
+  document.getElementById('p-' + id).textContent =
+    t.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  document.getElementById('p-' + id).className = 'card-price ' + t.side;
+  document.getElementById('v-' + id).textContent = 'vol ' + t.volume.toFixed(5);
+
+  const badge = document.getElementById('s-' + id);
+  badge.textContent = t.side.toUpperCase();
+  badge.className = 'side-badge ' + t.side;
+
+  card.classList.remove('flash-buy', 'flash-sell');
+  void card.offsetWidth;
+  card.classList.add('flash-' + t.side);
+  setTimeout(() => card.classList.remove('flash-buy', 'flash-sell'), 250);
+}
+
+function onAlert(a) {
+  alertCount++;
+  document.getElementById('alert-count').textContent = alertCount;
+
+  const empty = document.getElementById('empty');
+  if (empty) empty.remove();
+
+  const feed = document.getElementById('feed');
+  const row = document.createElement('div');
+  row.className = 'alert-row ' + a.severity;
+
+  const t = new Date(a.timestamp);
+  const ts = t.toLocaleTimeString('en-GB', {hour12: false});
+
+  row.innerHTML = `
+    <span class="alert-time">${ts}</span>
+    <span class="alert-symbol">${a.symbol}</span>
+    <span class="alert-detector">${a.detector}</span>
+    <span class="alert-msg">${a.message}</span>`;
+
+  feed.insertBefore(row, feed.firstChild);
+  while (feed.children.length > 100) feed.removeChild(feed.lastChild);
+}
+
+const es = new EventSource('/events');
+es.addEventListener('tick',  e => onTick(JSON.parse(e.data)));
+es.addEventListener('alert', e => onAlert(JSON.parse(e.data)));
+
+es.onopen = () => {
+  document.getElementById('dot').className = 'dot';
+  document.getElementById('status-text').textContent = 'live';
+};
+es.onerror = () => {
+  document.getElementById('dot').className = 'dot off';
+  document.getElementById('status-text').textContent = 'reconnecting…';
+};
+</script>
+</body>
+</html>

@@ -41,6 +41,7 @@ func main() {
 
 	registry := detectors.NewRegistry(
 		detectors.NewVolumeSpikeDetector(),
+		detectors.NewOrderFlowImbalanceDetector(),
 	)
 
 	log.Printf("detector worker %q starting, group %q", workerID, consumerGroup)
