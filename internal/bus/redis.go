@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	StreamTicks  = "ticks"
-	StreamAlerts = "alerts"
+	StreamTicks       = "ticks"
+	StreamAlerts      = "alerts"
+	StreamAlertsClean = "alerts-clean" // deduplicated alerts produced by the aggregator
 )
 
 // Publish serializes t as JSON and appends it to stream.
@@ -25,6 +26,20 @@ func Publish(ctx context.Context, rdb *redis.Client, stream string, t tick.Tick)
 	return rdb.XAdd(ctx, &redis.XAddArgs{
 		Stream: stream,
 		MaxLen: 100_000,
+		Approx: true,
+		Values: map[string]any{"data": string(data)},
+	}).Err()
+}
+
+// PublishAlertClean serializes a to JSON and appends it to the clean alerts stream.
+func PublishAlertClean(ctx context.Context, rdb *redis.Client, a alert.Alert) error {
+	data, err := json.Marshal(a)
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+	return rdb.XAdd(ctx, &redis.XAddArgs{
+		Stream: StreamAlertsClean,
+		MaxLen: 10_000,
 		Approx: true,
 		Values: map[string]any{"data": string(data)},
 	}).Err()

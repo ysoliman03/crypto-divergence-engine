@@ -28,7 +28,7 @@ func main() {
 	rdb := redis.NewClient(&redis.Options{Addr: addr})
 	defer rdb.Close()
 
-	log.Printf("listening on streams %q and %q (Ctrl+C to stop)...", bus.StreamTicks, bus.StreamAlerts)
+	log.Printf("listening on streams %q and %q (Ctrl+C to stop)...", bus.StreamTicks, bus.StreamAlertsClean)
 
 	ticksID := "$"
 	alertsID := "$"
@@ -36,7 +36,7 @@ func main() {
 	for {
 		// XREAD supports multiple streams in one blocking call.
 		streams, err := rdb.XRead(ctx, &redis.XReadArgs{
-			Streams: []string{bus.StreamTicks, bus.StreamAlerts, ticksID, alertsID},
+			Streams: []string{bus.StreamTicks, bus.StreamAlertsClean, ticksID, alertsID},
 			Block:   0,
 			Count:   100,
 		}).Result()
@@ -54,7 +54,7 @@ func main() {
 				case bus.StreamTicks:
 					ticksID = msg.ID
 					printTick(msg)
-				case bus.StreamAlerts:
+				case bus.StreamAlertsClean:
 					alertsID = msg.ID
 					printAlert(msg)
 				}

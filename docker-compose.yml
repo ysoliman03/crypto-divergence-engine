@@ -34,6 +34,18 @@ services:
       REDIS_ADDR: redis:6379
     restart: unless-stopped
 
+  aggregator:
+    build:
+      context: .
+      args:
+        CMD: aggregator
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_ADDR: redis:6379
+    restart: unless-stopped
+
   dashboard:
     build:
       context: .

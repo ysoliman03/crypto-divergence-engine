@@ -19,7 +19,7 @@ import (
 const (
 	consumerGroup  = "detectors"
 	blockDuration  = 2 * time.Second
-	batchSize      = 10
+	batchSize      = 100
 )
 
 func main() {

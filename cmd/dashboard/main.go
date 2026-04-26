@@ -95,7 +95,7 @@ func readStreams(ctx context.Context, rdb *redis.Client, h *hub) {
 
 	for {
 		streams, err := rdb.XRead(ctx, &redis.XReadArgs{
-			Streams: []string{bus.StreamTicks, bus.StreamAlerts, ticksID, alertsID},
+			Streams: []string{bus.StreamTicks, bus.StreamAlertsClean, ticksID, alertsID},
 			Block:   100 * time.Millisecond,
 			Count:   50,
 		}).Result()
@@ -120,7 +120,7 @@ func readStreams(ctx context.Context, rdb *redis.Client, h *hub) {
 				case bus.StreamTicks:
 					ticksID = msg.ID
 					h.broadcast("tick", data)
-				case bus.StreamAlerts:
+				case bus.StreamAlertsClean:
 					alertsID = msg.ID
 					h.broadcast("alert", data)
 				}
