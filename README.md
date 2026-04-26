@@ -21,9 +21,45 @@ The engine handles a bunch of tasks to keep an eye on crypto markets:
 
 - **Live Strategy Simulator**: Runs a stateful paper-trading session against recent Binance data. It executes buy/sell decisions, tracks PnL, trade count, and total account value over time.
 
-- **Benchmarking**: Scripts to measure performance, like how fast alerts show up and if the system scales when you add more workers.
+## Concurrency in Go
 
-- **Scaling**: Built on Redis Streams with consumer groups, so adding more detector containers splits the work automatically. No extra config needed.
+Each service is built around a few Go concurrency patterns rather than a framework. The ingester pairs a WebSocket reader goroutine with a Redis publisher goroutine connected by a buffered channel, so backpressure from Redis flows naturally back to the socket. Detector workers subscribe to the same Redis Stream as one consumer group, which means Redis distributes ticks between them and scaling out is a Compose flag rather than a code change. Per-symbol state sits behind a sharded map so writes to different symbols don't contend on the same lock. A root `context.Context` threads through every goroutine, so SIGINT drains in-flight work cleanly with no leaks. A background `XAUTOCLAIM` loop in each worker reclaims messages abandoned by dead siblings, which is what makes failure recovery automatic. The whole system runs around 70 goroutines across 6 containers, coordinated through Redis Streams and channels, with no shared memory between services.
+
+## Benchmarks
+
+### Scaling
+
+Constant load of 5000 ticks/sec for 90 seconds, adding a detector worker every 20s.
+
+With **1 worker**, consumption tops out around 2000/sec. The system can't keep up, pending messages accumulate, and lag climbs to 1.8 seconds by second 20.
+
+At second 20 a **second worker** joins. Combined consumption spikes to 6062/sec as both workers drain the backlog. Within two seconds, lag drops to 1ms and pending settles at 2 or 3. Adding a third and fourth worker later in the run causes no disruption, with lag staying under 2ms throughout.
+
+| Phase | Workers | Consumption | Lag |
+|---|---|---|---|
+| Saturated | 1 | ~2000/s | growing to 1846ms |
+| Recovery | 2 | 6062/s spike | drops to 0ms |
+| Steady state | 2 to 4 | matches load | 0 to 2ms |
+
+Workers are interchangeable, Redis Streams handles distribution, and `docker compose up --scale detector=N` is the entire scaling interface.
+
+### Failure recovery
+
+Steady 300 ticks/sec with one worker. After 30 seconds of normal operation, the worker was killed with `docker kill`, left dead for 20 seconds, then restarted.
+
+While the worker is dead, consumption drops to zero and lag grows by one second per second of clock time, hitting 20 seconds of backlog. When the new worker rejoins the consumer group, it reclaims the abandoned messages and processes 3500 ticks in one second to drain the backlog. Lag returns to 2ms by the next sample.
+
+| Phase | Consumption | Lag |
+|---|---|---|
+| Normal | ~300/s | 1 to 3ms |
+| Worker dead | 0/s | grows to 20s |
+| After restart | 3500/s spike | drops to 2ms |
+
+**No messages are lost. Redis holds them in the stream and reassigns them when a consumer comes back, which is the guarantee consumer groups provide.**
+
+---
+
+About 60% the length, same content, no fluff. The graphs (when you add them) will carry a lot of the explanation, so the prose can stay this lean.
 
 ## Tech Stack
 
