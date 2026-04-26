@@ -49,3 +49,23 @@ func (r *RingBuffer) SumSince(now time.Time, window time.Duration) float64 {
 }
 
 func (r *RingBuffer) Len() int { return r.count }
+
+// Slice returns the values of the last n entries, oldest first.
+// If n exceeds the number of valid entries, all entries are returned.
+func (r *RingBuffer) Slice(n int) []float64 {
+	if n > r.count {
+		n = r.count
+	}
+	if n == 0 {
+		return nil
+	}
+	start := r.head - n
+	if start < 0 {
+		start += len(r.entries)
+	}
+	out := make([]float64, n)
+	for i := range n {
+		out[i] = r.entries[(start+i)%len(r.entries)].Value
+	}
+	return out
+}
