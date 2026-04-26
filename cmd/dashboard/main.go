@@ -70,6 +70,8 @@ func main() {
 	h := newHub()
 	go readStreams(ctx, rdb, h)
 
+	sm := newSessionManager(h)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -78,6 +80,11 @@ func main() {
 	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 		serveSSE(w, r, h)
 	})
+	mux.HandleFunc("/api/backtest", handleBacktest)
+	mux.HandleFunc("/api/backtest/custom", handleCustomBacktest)
+	mux.HandleFunc("/api/live-strategy/start", sm.handleStart)
+	mux.HandleFunc("/api/live-strategy/stop", sm.handleStop)
+	mux.HandleFunc("/api/live-strategy/sessions", sm.handleList)
 
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {

@@ -1,3 +1,5 @@
+// This file knows everything about Binance and nothing about Redis. 
+// Its one job: connect to Binance, read trade messages, convert them into Tick structs.
 package ingester
 
 import (

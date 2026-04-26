@@ -4,13 +4,36 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Divergence Engine</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
+:root {
+  --bg:       #0f0f0f;
+  --surface:  #1a1a1a;
+  --surface2: #222222;
+  --border:   #2a2a2a;
+  --text:     #f0f0f0;
+  --muted:    #888888;
+  --accent:   #ffffff;
+  --green:    #22c55e;
+  --green-bg: rgba(34,197,94,.1);
+  --red:      #ef4444;
+  --red-bg:   rgba(239,68,68,.1);
+  --amber:    #f59e0b;
+  --amber-bg: rgba(245,158,11,.1);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #0d1117;
-  color: #e6edf3;
-  font-family: 'Courier New', monospace;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -21,105 +44,373 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-
-.logo { font-size: 13px; font-weight: bold; color: #58a6ff; letter-spacing: 2px; }
-
-.header-stats { display: flex; gap: 24px; font-size: 12px; color: #8b949e; }
-.header-stats span { color: #e6edf3; }
-
-.status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8b949e; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; animation: pulse 2s infinite; }
-.dot.off { background: #f85149; animation: none; }
+.logo { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
+.header-stats { display: flex; gap: 28px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.header-stats span { color: var(--text); font-weight: 600; }
+.status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+.dot.off { background: var(--red); animation: none; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-main {
+/* Tabs */
+.tab-bar {
   display: flex;
-  flex-direction: column;
-  flex: 1;
-  overflow: hidden;
-  padding: 16px;
-  gap: 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  flex-shrink: 0;
 }
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 12px 16px;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 
-/* ── Price cards ── */
+.tab-panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.tab-panel.active { display: flex; }
+
+/* Live tab */
+#tab-live { padding: 20px 24px; gap: 16px; }
+
 .prices {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   flex-shrink: 0;
 }
-
 .price-card {
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
   transition: border-color 0.2s;
 }
-.price-card.flash-buy  { border-color: #3fb950; }
-.price-card.flash-sell { border-color: #f85149; }
+.price-card.flash-buy  { border-color: var(--green); }
+.price-card.flash-sell { border-color: var(--red); }
+.card-symbol { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; font-weight: 600; margin-bottom: 10px; }
+.card-price { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; transition: color 0.15s; }
+.card-price.buy     { color: var(--green); }
+.card-price.sell    { color: var(--red); }
+.card-price.neutral { color: var(--text); }
+.card-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-weight: 500; }
+.side-badge { font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 600; }
+.side-badge.buy  { background: var(--green-bg); color: var(--green); }
+.side-badge.sell { background: var(--red-bg);   color: var(--red); }
 
-.card-symbol { font-size: 11px; color: #8b949e; letter-spacing: 1px; margin-bottom: 8px; }
-
-.card-price {
-  font-size: 26px;
-  font-weight: bold;
-  margin-bottom: 6px;
-  transition: color 0.15s;
-}
-.card-price.buy  { color: #3fb950; }
-.card-price.sell { color: #f85149; }
-.card-price.neutral { color: #e6edf3; }
-
-.card-meta { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; }
-
-.side-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
-.side-badge.buy  { background: rgba(63,185,80,.15); color: #3fb950; }
-.side-badge.sell { background: rgba(248,81,73,.15);  color: #f85149; }
-
-/* ── Alert feed ── */
 .alerts-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-.section-title {
-  font-size: 11px; color: #8b949e; letter-spacing: 1px;
-  text-transform: uppercase; margin-bottom: 8px; flex-shrink: 0;
-}
-
-.alerts-feed {
-  flex: 1; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 6px;
-}
+.section-title { font-size: 11px; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; font-weight: 600; margin-bottom: 10px; flex-shrink: 0; }
+.alerts-feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .alerts-feed::-webkit-scrollbar { width: 4px; }
-.alerts-feed::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
-
+.alerts-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 .alert-row {
-  display: flex; align-items: baseline; gap: 10px;
-  padding: 8px 12px;
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-left: 3px solid #d29922;
-  border-radius: 4px;
-  font-size: 12px;
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: 10px;
+  font-size: 13px;
   flex-shrink: 0;
   animation: slideIn .2s ease;
 }
-.alert-row.critical { border-left-color: #f85149; }
-.alert-row.warning  { border-left-color: #d29922; }
-.alert-row.info     { border-left-color: #58a6ff; }
-
+.alert-row.critical { border-left-color: var(--red); }
+.alert-row.warning  { border-left-color: var(--amber); }
+.alert-row.info     { border-left-color: var(--accent); }
 @keyframes slideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+.alert-time     { color: var(--muted); flex-shrink: 0; font-size: 12px; }
+.alert-symbol   { color: var(--accent); font-weight: 600; flex-shrink: 0; min-width: 90px; }
+.alert-detector { color: var(--muted); flex-shrink: 0; min-width: 180px; font-size: 12px; }
+.alert-msg      { color: var(--text); flex: 1; }
+.empty { color: var(--muted); font-size: 13px; padding: 20px; text-align: center; }
 
-.alert-time     { color: #8b949e; flex-shrink: 0; }
-.alert-symbol   { color: #58a6ff; font-weight: bold; flex-shrink: 0; min-width: 90px; }
-.alert-detector { color: #8b949e; flex-shrink: 0; min-width: 180px; }
-.alert-msg      { color: #e6edf3; flex: 1; }
+/* Backtest tab */
+#tab-backtest { overflow-y: auto; padding: 20px 24px; gap: 16px; }
+#tab-backtest::-webkit-scrollbar { width: 4px; }
+#tab-backtest::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.empty { color: #8b949e; font-size: 12px; padding: 20px; text-align: center; }
+.bt-section-label { font-size: 11px; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; font-weight: 600; margin-bottom: 10px; flex-shrink: 0; }
+
+.bt-gallery { display: flex; gap: 12px; overflow-x: auto; flex-shrink: 0; padding-bottom: 4px; }
+.bt-gallery::-webkit-scrollbar { height: 4px; }
+.bt-gallery::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.bt-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 210px;
+  max-width: 210px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.bt-card:hover  { border-color: rgba(255,255,255,.2); }
+.bt-card.active { border-color: var(--accent); background: rgba(255,255,255,.04); }
+
+.bt-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.bt-card-icon { font-size: 14px; color: var(--accent); font-weight: 600; }
+.bt-card-name { font-size: 13px; font-weight: 600; color: var(--text); }
+
+.bt-card-badges { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.bt-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.bt-badge.trend     { background: rgba(255,255,255,.08); color: var(--muted); }
+.bt-badge.reversion { background: var(--amber-bg);       color: var(--amber); }
+.bt-badge.custom    { background: rgba(255,255,255,.08); color: var(--muted); }
+.bt-badge.beginner  { background: var(--green-bg);       color: var(--green); }
+.bt-badge.intermediate { background: var(--amber-bg);    color: var(--amber); }
+.bt-badge.advanced  { background: var(--red-bg);         color: var(--red); }
+
+.bt-card-desc { font-size: 12px; color: var(--muted); line-height: 1.55; margin-bottom: 12px; }
+.bt-card-features { display: flex; flex-wrap: wrap; gap: 5px; }
+.bt-feature-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--surface2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+/* Config form */
+.bt-config {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+.bt-field { display: flex; flex-direction: column; gap: 6px; }
+.bt-field label { font-size: 11px; color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase; font-weight: 600; }
+.bt-field input,
+.bt-field select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 12px;
+  width: 120px;
+}
+.bt-field select { width: 135px; }
+.bt-field input[type="date"] { width: 148px; }
+.bt-field input:focus, .bt-field select:focus { outline: none; border-color: var(--accent); }
+
+.bt-run {
+  background: #ffffff;
+  border: none;
+  border-radius: 8px;
+  color: #0c0c14;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 22px;
+  cursor: pointer;
+  align-self: flex-end;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.bt-run:hover    { opacity: 0.85; }
+.bt-run:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.bt-error { color: var(--red); font-size: 13px; font-weight: 500; }
+
+/* Result stats */
+.bt-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; flex-shrink: 0; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.stat-label { font-size: 11px; color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase; font-weight: 600; margin-bottom: 8px; }
+.stat-value { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+.stat-value.positive { color: var(--green); }
+.stat-value.negative { color: var(--red); }
+.stat-sub { font-size: 11px; color: var(--muted); margin-top: 5px; font-weight: 500; }
+
+.bt-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; flex-shrink: 0; }
+.bt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bt-table th {
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-weight: 600;
+  text-align: left;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.bt-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); font-weight: 500; }
+.bt-table tr:last-child td { border-bottom: none; }
+.bt-table td.buy      { color: var(--green); font-weight: 700; }
+.bt-table td.sell     { color: var(--red);   font-weight: 700; }
+.bt-table td.positive { color: var(--green); }
+.bt-table td.negative { color: var(--red); }
+.bt-table td.neutral  { color: var(--muted); }
+
+/* Code editor */
+.bt-editor-wrap { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; flex-shrink: 0; }
+.bt-editor-toolbar {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 9px 16px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bt-editor-toolbar span:first-child { color: var(--accent); font-weight: 600; }
+.CodeMirror { height: 360px; font-family: 'Courier New', Consolas, monospace; font-size: 13px; line-height: 1.65; }
+
+/* ── Live Strategy tab ─────────────────────────────────── */
+#tab-live-strategy { padding: 20px 24px; gap: 16px; overflow-y: auto; }
+
+.ls-setup {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.ls-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.ls-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.ls-strategy-option {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ls-strategy-option:hover { border-color: rgba(255,255,255,.2); }
+.ls-strategy-option.active { border-color: var(--accent); background: rgba(255,255,255,.04); }
+.ls-strategy-option-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.ls-strategy-option-cat  { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+.ls-controls {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.ls-symbols-group { display: flex; flex-direction: column; gap: 8px; }
+.ls-symbols-group > span {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  letter-spacing: 0.4px; text-transform: uppercase;
+}
+.ls-checkboxes { display: flex; gap: 16px; }
+.ls-checkboxes label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--text); font-weight: 500; cursor: pointer;
+}
+.ls-checkboxes input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
+
+.ls-field { display: flex; flex-direction: column; gap: 6px; }
+.ls-field label { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase; }
+.ls-field select {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; padding: 7px 10px; cursor: pointer;
+}
+
+.ls-start-btn {
+  background: #ffffff; border: none; border-radius: 8px; color: #0f0f0f;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+  padding: 8px 22px; cursor: pointer; align-self: flex-end;
+}
+.ls-start-btn:hover { opacity: 0.85; }
+
+.ls-sessions-header {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0;
+}
+
+.ls-sessions { display: flex; flex-direction: column; gap: 12px; }
+
+.ls-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0; }
+
+.ls-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.ls-card-info { flex: 1; min-width: 0; }
+.ls-card-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.ls-card-symbol { font-size: 16px; font-weight: 700; color: var(--text); }
+.ls-card-sub { font-size: 12px; color: var(--muted); }
+.ls-card-details { display: flex; gap: 16px; font-size: 12px; color: var(--muted); flex-wrap: wrap; margin-top: 6px; }
+
+.ls-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 9px;
+  border-radius: 20px; text-transform: uppercase; letter-spacing: 0.4px;
+}
+.ls-badge.long  { background: var(--green-bg); color: var(--green); }
+.ls-badge.flat  { background: var(--surface2); color: var(--muted); }
+.ls-badge.buy   { background: var(--green-bg); color: var(--green); }
+.ls-badge.sell  { background: var(--red-bg);   color: var(--red); }
+.ls-badge.hold  { background: var(--surface2); color: var(--muted); }
+
+.ls-pnl { font-size: 34px; font-weight: 700; letter-spacing: -1px; min-width: 140px; text-align: right; }
+.ls-pnl.positive { color: var(--green); }
+.ls-pnl.negative { color: var(--red); }
+.ls-pnl.neutral  { color: var(--muted); }
+
+.ls-stop-btn {
+  background: transparent; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); font-family: 'Inter', sans-serif; font-size: 12px;
+  font-weight: 500; padding: 6px 14px; cursor: pointer; flex-shrink: 0;
+}
+.ls-stop-btn:hover { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
@@ -136,9 +427,15 @@ main {
   </div>
 </header>
 
-<main>
-  <div class="prices" id="prices"></div>
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="live">Live Feed</button>
+  <button class="tab-btn" data-tab="backtest">Backtesting</button>
+  <button class="tab-btn" data-tab="live-strategy">Live Strategy</button>
+</nav>
 
+<!-- Live tab -->
+<main id="tab-live" class="tab-panel active">
+  <div class="prices" id="prices"></div>
   <div class="alerts-section">
     <div class="section-title">Alert Feed</div>
     <div class="alerts-feed" id="feed">
@@ -147,7 +444,145 @@ main {
   </div>
 </main>
 
+<!-- Backtest tab -->
+<div id="tab-backtest" class="tab-panel">
+
+  <div>
+    <div class="bt-section-label">Strategy</div>
+    <div class="bt-gallery" id="bt-gallery"></div>
+  </div>
+
+  <div class="bt-config" id="bt-config">
+    <!-- Common params -->
+    <div class="bt-field">
+      <label>Symbol</label>
+      <select id="bt-symbol">
+        <option value="BTCUSDT">BTC-USDT</option>
+        <option value="ETHUSDT">ETH-USDT</option>
+        <option value="SOLUSDT">SOL-USDT</option>
+      </select>
+    </div>
+    <div class="bt-field">
+      <label>Interval</label>
+      <select id="bt-interval">
+        <option value="1d">1 day</option>
+        <option value="4h">4 hours</option>
+        <option value="1h">1 hour</option>
+      </select>
+    </div>
+    <div class="bt-field">
+      <label>From</label>
+      <input type="date" id="bt-from">
+    </div>
+    <div class="bt-field">
+      <label>To</label>
+      <input type="date" id="bt-to">
+    </div>
+    <div class="bt-field">
+      <label>Forward (bars)</label>
+      <input type="number" id="bt-fwd" value="5" min="1" max="90">
+    </div>
+    <button class="bt-run" id="bt-run">Run Backtest</button>
+  </div>
+
+  <div class="bt-error" id="bt-error"></div>
+
+  <div id="bt-editor-wrap" class="bt-editor-wrap">
+    <div class="bt-editor-toolbar">
+      <span>strategy.py</span>
+      <span>on_bar(i, closes, opens, highs, lows, volumes, dates, position, memory) → "buy" | "sell" | None</span>
+    </div>
+    <textarea id="bt-code"></textarea>
+  </div>
+
+  <div id="bt-results" style="display:none; flex-direction:column; gap:14px;">
+    <div class="bt-stats">
+      <div class="stat-card">
+        <div class="stat-label">Strategy Return</div>
+        <div class="stat-value" id="bt-stat-ret">—</div>
+        <div class="stat-sub">compounded buy/sell pairs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="bt-stat-wr">—</div>
+        <div class="stat-sub" id="bt-stat-wr-sub">buy signals with positive forward return</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Signal Correlation</div>
+        <div class="stat-value" id="bt-stat-corr">—</div>
+        <div class="stat-sub" id="bt-stat-corr-sub">buy signal vs N-bar forward return</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Signals Found</div>
+        <div class="stat-value" id="bt-stat-n">—</div>
+        <div class="stat-sub" id="bt-stat-bars">bars analyzed</div>
+      </div>
+    </div>
+
+    <div class="bt-table-wrap">
+      <table class="bt-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Signal</th>
+            <th>Price</th>
+            <th id="bt-fwd-col-header">Forward Return</th>
+          </tr>
+        </thead>
+        <tbody id="bt-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Live Strategy tab -->
+<div id="tab-live-strategy" class="tab-panel">
+  <div class="ls-setup">
+    <div>
+      <div class="ls-section-label">Strategy</div>
+      <div class="ls-strategy-grid" id="ls-gallery"></div>
+    </div>
+    <div class="ls-controls">
+      <div class="ls-symbols-group">
+        <span>Symbols</span>
+        <div class="ls-checkboxes">
+          <label><input type="checkbox" class="ls-sym" value="BTCUSDT" checked> BTC-USDT</label>
+          <label><input type="checkbox" class="ls-sym" value="ETHUSDT"> ETH-USDT</label>
+          <label><input type="checkbox" class="ls-sym" value="SOLUSDT"> SOL-USDT</label>
+        </div>
+      </div>
+      <div class="ls-field">
+        <label>Interval</label>
+        <select id="ls-interval">
+          <option value="1m">1 minute</option>
+          <option value="5m">5 minutes</option>
+          <option value="15m">15 minutes</option>
+          <option value="1h">1 hour</option>
+        </select>
+      </div>
+      <button class="ls-start-btn" id="ls-start">Start Live Strategy</button>
+    </div>
+  </div>
+
+  <div class="ls-sessions-header">Active Sessions</div>
+  <div class="ls-sessions" id="ls-sessions">
+    <div class="ls-empty" id="ls-empty">No active sessions — pick a strategy and click Start</div>
+  </div>
+</div>
+
 <script>
+// ── Tab switching ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    btn.classList.add('active');
+  });
+});
+
+// ── Live feed ──
 let tickCount = 0, lastTickCount = 0, alertCount = 0;
 
 setInterval(() => {
@@ -179,16 +614,13 @@ function onTick(t) {
   tickCount++;
   const card = getCard(t.symbol);
   const id = sym(t.symbol);
-
   document.getElementById('p-' + id).textContent =
     t.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   document.getElementById('p-' + id).className = 'card-price ' + t.side;
   document.getElementById('v-' + id).textContent = 'vol ' + t.volume.toFixed(5);
-
   const badge = document.getElementById('s-' + id);
   badge.textContent = t.side.toUpperCase();
   badge.className = 'side-badge ' + t.side;
-
   card.classList.remove('flash-buy', 'flash-sell');
   void card.offsetWidth;
   card.classList.add('flash-' + t.side);
@@ -198,23 +630,18 @@ function onTick(t) {
 function onAlert(a) {
   alertCount++;
   document.getElementById('alert-count').textContent = alertCount;
-
   const empty = document.getElementById('empty');
   if (empty) empty.remove();
-
   const feed = document.getElementById('feed');
   const row = document.createElement('div');
   row.className = 'alert-row ' + a.severity;
-
   const t = new Date(a.timestamp);
   const ts = t.toLocaleTimeString('en-GB', {hour12: false});
-
   row.innerHTML = `
     <span class="alert-time">${ts}</span>
     <span class="alert-symbol">${a.symbol}</span>
     <span class="alert-detector">${a.detector}</span>
     <span class="alert-msg">${a.message}</span>`;
-
   feed.insertBefore(row, feed.firstChild);
   while (feed.children.length > 100) feed.removeChild(feed.lastChild);
 }
@@ -222,7 +649,6 @@ function onAlert(a) {
 const es = new EventSource('/events');
 es.addEventListener('tick',  e => onTick(JSON.parse(e.data)));
 es.addEventListener('alert', e => onAlert(JSON.parse(e.data)));
-
 es.onopen = () => {
   document.getElementById('dot').className = 'dot';
   document.getElementById('status-text').textContent = 'live';
@@ -231,6 +657,501 @@ es.onerror = () => {
   document.getElementById('dot').className = 'dot off';
   document.getElementById('status-text').textContent = 'reconnecting…';
 };
+
+// ── Backtest ──
+
+// Code for each strategy. Loaded into the editor when the card is selected.
+const STRATEGY_CODE = {
+
+custom: `def on_bar(i, closes, opens, highs, lows, volumes, dates, position, memory):
+    """
+    i        : current bar index (0 = oldest bar)
+    closes   : list of all closing prices up to bar i (inclusive)
+    opens, highs, lows, volumes : same
+    dates    : list of date strings ("YYYY-MM-DD")
+    position : 0 = flat,  1 = long
+    memory   : dict that persists between bars — store your state here
+
+    Return "buy" to enter, "sell" to exit, or None to hold.
+    """
+    if i < 21:
+        return None
+
+    fast = sum(closes[i-8:i+1]) / 9
+    slow = sum(closes[i-20:i+1]) / 21
+
+    if fast > slow and position == 0:
+        return "buy"
+    if fast < slow and position == 1:
+        return "sell"
+    return None
+`,
+
+sma_crossover: `def on_bar(i, closes, opens, highs, lows, volumes, dates, position, memory):
+    fast_period = 9
+    slow_period = 21
+
+    if i < slow_period - 1:
+        return None
+
+    fast = sum(closes[i - fast_period + 1 : i + 1]) / fast_period
+    slow = sum(closes[i - slow_period + 1 : i + 1]) / slow_period
+
+    if fast > slow and position == 0:
+        return "buy"
+    if fast < slow and position == 1:
+        return "sell"
+    return None
+`,
+
+ema_crossover: `def on_bar(i, closes, opens, highs, lows, volumes, dates, position, memory):
+    fast_period = 9
+    slow_period = 21
+    k_fast = 2 / (fast_period + 1)
+    k_slow = 2 / (slow_period + 1)
+
+    if i == 0:
+        memory['fast'] = closes[0]
+        memory['slow'] = closes[0]
+        return None
+
+    memory['fast'] = closes[i] * k_fast + memory['fast'] * (1 - k_fast)
+    memory['slow'] = closes[i] * k_slow + memory['slow'] * (1 - k_slow)
+
+    if i < slow_period:
+        return None
+
+    if memory['fast'] > memory['slow'] and position == 0:
+        return "buy"
+    if memory['fast'] < memory['slow'] and position == 1:
+        return "sell"
+    return None
+`,
+
+rsi_mean_reversion: `def on_bar(i, closes, opens, highs, lows, volumes, dates, position, memory):
+    period     = 14
+    oversold   = 30
+    overbought = 70
+
+    if i == 0:
+        memory['avg_gain'] = 0
+        memory['avg_loss'] = 0
+        memory['seeded']   = False
+        return None
+
+    diff = closes[i] - closes[i - 1]
+    gain = max(diff, 0)
+    loss = max(-diff, 0)
+
+    if not memory['seeded']:
+        # Accumulate simple average for the first \`period\` differences.
+        memory['avg_gain'] += gain / period
+        memory['avg_loss'] += loss / period
+        if i >= period:
+            memory['seeded'] = True
+        return None
+
+    # Wilder's smoothing.
+    memory['avg_gain'] = (memory['avg_gain'] * (period - 1) + gain) / period
+    memory['avg_loss'] = (memory['avg_loss'] * (period - 1) + loss) / period
+
+    if memory['avg_loss'] == 0:
+        rsi = 100
+    else:
+        rsi = 100 - 100 / (1 + memory['avg_gain'] / memory['avg_loss'])
+
+    if rsi < oversold and position == 0:
+        return "buy"
+    if rsi > overbought and position == 1:
+        return "sell"
+    return None
+`,
+
+bollinger_bands: `def on_bar(i, closes, opens, highs, lows, volumes, dates, position, memory):
+    period   = 20
+    std_devs = 2.0
+
+    if i < period - 1:
+        return None
+
+    window = closes[i - period + 1 : i + 1]
+    sma    = sum(window) / period
+    std    = (sum((x - sma) ** 2 for x in window) / period) ** 0.5
+    lower  = sma - std_devs * std
+
+    # Buy when price dips below the lower band, exit when it returns to the midline.
+    if closes[i] < lower and position == 0:
+        return "buy"
+    if closes[i] > sma and position == 1:
+        return "sell"
+    return None
+`,
+
+breakout: `def on_bar(i, closes, opens, highs, lows, volumes, dates, position, memory):
+    lookback  = 20
+    hold_bars = 10
+
+    if position == 1:
+        if i - memory.get('entry_bar', i) >= hold_bars:
+            return "sell"
+        return None
+
+    if i < lookback:
+        return None
+
+    channel_high = max(closes[i - lookback : i])  # highest close excluding current bar
+    if closes[i] > channel_high:
+        memory['entry_bar'] = i
+        return "buy"
+
+    return None
+`,
+
+};
+
+const STRATEGIES = [
+  {
+    id: 'custom',
+    name: 'Custom Strategy',
+    icon: '{ }',
+    category: 'Custom',
+    difficulty: 'Advanced',
+    desc: 'Write any strategy in Python. Full OHLCV access per bar. Modify the presets below or start from scratch.',
+    features: ['Python code', 'Full OHLCV access', 'Any indicator'],
+  },
+  {
+    id: 'sma_crossover',
+    name: 'SMA Crossover',
+    icon: '↗',
+    category: 'Trend Following',
+    difficulty: 'Beginner',
+    desc: 'Buy when the fast SMA crosses above the slow SMA. Sell when it crosses back below.',
+    features: ['Simple moving averages', 'Clear entry/exit rules', 'Trend identification'],
+  },
+  {
+    id: 'ema_crossover',
+    name: 'EMA Crossover',
+    icon: '↗',
+    category: 'Trend Following',
+    difficulty: 'Beginner',
+    desc: 'Same as SMA crossover but exponential averages react faster to recent price changes.',
+    features: ['Exponential averages', 'Reduced lag', 'Faster trend detection'],
+  },
+  {
+    id: 'rsi_mean_reversion',
+    name: 'RSI Mean Reversion',
+    icon: '⇌',
+    category: 'Mean Reversion',
+    difficulty: 'Beginner',
+    desc: 'Buy when RSI drops below the oversold level, sell when it climbs above overbought.',
+    features: ['RSI indicator', 'Contrarian approach', 'Overbought/oversold levels'],
+  },
+  {
+    id: 'bollinger_bands',
+    name: 'Bollinger Bands',
+    icon: '⇌',
+    category: 'Mean Reversion',
+    difficulty: 'Intermediate',
+    desc: 'Buy when price touches the lower band. Exit when price returns to the midline.',
+    features: ['Volatility-adjusted bands', 'Standard deviation levels', 'Mean reversion'],
+  },
+  {
+    id: 'breakout',
+    name: 'Price Breakout',
+    icon: '↑',
+    category: 'Trend Following',
+    difficulty: 'Intermediate',
+    desc: 'Buy when price breaks above the highest high of the last N bars. Exit after a fixed hold period.',
+    features: ['Channel breakout', 'Price momentum', 'Time-based exit'],
+  },
+];
+
+let selectedStrategy = STRATEGIES[0];
+let codeEditor = null;
+
+function buildGallery() {
+  const gallery = document.getElementById('bt-gallery');
+  gallery.innerHTML = '';
+  STRATEGIES.forEach(s => {
+    const catClass = s.category === 'Trend Following' ? 'trend'
+                   : s.category === 'Custom'          ? 'custom'
+                   : 'reversion';
+    const diffClass = s.difficulty.toLowerCase();
+    const features = s.features.map(f => `<span class="bt-feature-tag">${f}</span>`).join('');
+    const card = document.createElement('div');
+    card.className = 'bt-card' + (s.id === selectedStrategy.id ? ' active' : '');
+    card.dataset.id = s.id;
+    card.innerHTML = `
+      <div class="bt-card-header">
+        <span class="bt-card-icon">${s.icon}</span>
+        <span class="bt-card-name">${s.name}</span>
+      </div>
+      <div class="bt-card-badges">
+        <span class="bt-badge ${catClass}">${s.category}</span>
+        <span class="bt-badge ${diffClass}">${s.difficulty}</span>
+      </div>
+      <div class="bt-card-desc">${s.desc}</div>
+      <div class="bt-card-features">${features}</div>`;
+    card.addEventListener('click', () => selectStrategy(s));
+    gallery.appendChild(card);
+  });
+}
+
+function selectStrategy(strategy) {
+  selectedStrategy = strategy;
+  document.querySelectorAll('.bt-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.id === strategy.id);
+  });
+  document.getElementById('bt-results').style.display = 'none';
+  document.getElementById('bt-error').textContent = '';
+  if (codeEditor) {
+    codeEditor.setValue(STRATEGY_CODE[strategy.id] || '');
+  }
+}
+
+// Default dates: 1 year range
+(function() {
+  const today = new Date();
+  document.getElementById('bt-to').value = today.toISOString().split('T')[0];
+  const yearAgo = new Date(today);
+  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  document.getElementById('bt-from').value = yearAgo.toISOString().split('T')[0];
+})();
+
+buildGallery();
+
+// Initialize CodeMirror once, immediately — editor is always visible.
+codeEditor = CodeMirror.fromTextArea(document.getElementById('bt-code'), {
+  mode: 'python',
+  theme: 'dracula',
+  lineNumbers: true,
+  indentUnit: 4,
+  tabSize: 4,
+  indentWithTabs: false,
+  lineWrapping: false,
+});
+codeEditor.setValue(STRATEGY_CODE[selectedStrategy.id] || '');
+
+document.getElementById('bt-run').addEventListener('click', async () => {
+  const btn = document.getElementById('bt-run');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+  document.getElementById('bt-error').textContent = '';
+  document.getElementById('bt-results').style.display = 'none';
+
+  const fwdDays = parseInt(document.getElementById('bt-fwd').value);
+
+  const req = {
+    symbol:      document.getElementById('bt-symbol').value,
+    interval:    document.getElementById('bt-interval').value,
+    fromDate:    document.getElementById('bt-from').value,
+    toDate:      document.getElementById('bt-to').value,
+    forwardDays: fwdDays,
+    code:        codeEditor ? codeEditor.getValue() : '',
+  };
+
+  try {
+    const res = await fetch('/api/backtest/custom', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(req),
+    });
+    const data = await res.json();
+    if (data.error) {
+      document.getElementById('bt-error').textContent = data.error;
+    } else {
+      renderBacktest(data, fwdDays);
+    }
+  } catch(e) {
+    document.getElementById('bt-error').textContent = 'Request failed: ' + e.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Run Backtest';
+});
+
+function renderBacktest(data, fwdDays) {
+  const retEl = document.getElementById('bt-stat-ret');
+  retEl.textContent = (data.stratReturn >= 0 ? '+' : '') + data.stratReturn.toFixed(2) + '%';
+  retEl.className = 'stat-value ' + (data.stratReturn >= 0 ? 'positive' : 'negative');
+
+  document.getElementById('bt-stat-wr').textContent = data.winRate.toFixed(1) + '%';
+  document.getElementById('bt-stat-wr-sub').textContent =
+    'buy signals with positive ' + fwdDays + '-bar return';
+
+  const corrEl = document.getElementById('bt-stat-corr');
+  corrEl.textContent = data.correlation.toFixed(4);
+  corrEl.className = 'stat-value ' + (data.correlation > 0.05 ? 'positive' : data.correlation < -0.05 ? 'negative' : '');
+  document.getElementById('bt-stat-corr-sub').textContent =
+    'signal vs ' + fwdDays + '-bar forward return';
+
+  document.getElementById('bt-stat-n').textContent = data.numSignals;
+  document.getElementById('bt-stat-bars').textContent = data.barsUsed + ' bars analyzed';
+  document.getElementById('bt-fwd-col-header').textContent = 'Forward Return (' + fwdDays + ' bars)';
+
+  const tbody = document.getElementById('bt-tbody');
+  tbody.innerHTML = '';
+
+  if (!data.signals || data.signals.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#8b949e;padding:20px">No signals found in this period</td></tr>';
+  } else {
+    for (const s of data.signals) {
+      const tr = document.createElement('tr');
+      const fwdText = s.hasForward
+        ? (s.forwardReturn >= 0 ? '+' : '') + s.forwardReturn.toFixed(2) + '%'
+        : 'n/a';
+      const fwdClass = !s.hasForward ? 'neutral' : s.forwardReturn >= 0 ? 'positive' : 'negative';
+      tr.innerHTML =
+        `<td>${s.date}</td>` +
+        `<td class="${s.type}">${s.type.toUpperCase()}</td>` +
+        `<td>${s.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>` +
+        `<td class="${fwdClass}">${fwdText}</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  document.getElementById('bt-results').style.display = 'flex';
+}
+
+// ── Live Strategy ──────────────────────────────────────────────────────────
+
+const LS_STRATEGIES = STRATEGIES.filter(s => s.id !== 'custom');
+let lsSelected = LS_STRATEGIES[0];
+const lsCards = {}; // symbol → DOM element
+
+function buildLsGallery() {
+  const grid = document.getElementById('ls-gallery');
+  grid.innerHTML = '';
+  LS_STRATEGIES.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'ls-strategy-option' + (s.id === lsSelected.id ? ' active' : '');
+    el.dataset.id = s.id;
+    el.innerHTML = `<div class="ls-strategy-option-name">${s.name}</div>
+                    <div class="ls-strategy-option-cat">${s.category}</div>`;
+    el.addEventListener('click', () => {
+      lsSelected = s;
+      document.querySelectorAll('.ls-strategy-option').forEach(o =>
+        o.classList.toggle('active', o.dataset.id === s.id));
+    });
+    grid.appendChild(el);
+  });
+}
+
+function fmtPrice(p) {
+  return p.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function fmtElapsed(startIso) {
+  const ms = Date.now() - new Date(startIso).getTime();
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ' + (s % 60) + 's';
+  return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+}
+
+function renderLsCard(snap) {
+  const sessions = document.getElementById('ls-sessions');
+  document.getElementById('ls-empty')?.remove();
+
+  const pnl      = snap.pnl;
+  const pnlClass = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : 'neutral';
+  const pnlText  = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
+  const stratName = LS_STRATEGIES.find(s => s.id === snap.strategy)?.name ?? snap.strategy;
+
+  let entryDetail = snap.position === 'long'
+    ? `Entry $${fmtPrice(snap.entryPrice)} &middot; `
+    : '';
+
+  const inner = `
+    <div class="ls-card-info">
+      <div class="ls-card-top">
+        <span class="ls-card-symbol">${snap.symbol.replace('USDT','-USDT')}</span>
+        <span class="ls-badge ${snap.position}">${snap.position.toUpperCase()}</span>
+        <span class="ls-badge ${snap.signal}">${snap.signal.toUpperCase()}</span>
+      </div>
+      <div class="ls-card-sub">${stratName} &middot; ${snap.interval}</div>
+      <div class="ls-card-details">
+        <span>${entryDetail}Current $${fmtPrice(snap.currentPrice)}</span>
+        <span>${snap.trades} trade${snap.trades !== 1 ? 's' : ''}</span>
+        <span class="ls-elapsed" data-start="${snap.startTime}">—</span>
+      </div>
+    </div>
+    <div class="ls-pnl ${pnlClass}">${pnlText}</div>
+    <button class="ls-stop-btn" data-sym="${snap.symbol}">Stop</button>`;
+
+  if (lsCards[snap.symbol]) {
+    lsCards[snap.symbol].innerHTML = inner;
+  } else {
+    const card = document.createElement('div');
+    card.className = 'ls-card';
+    card.id = 'ls-card-' + snap.symbol;
+    card.innerHTML = inner;
+    sessions.appendChild(card);
+    lsCards[snap.symbol] = card;
+  }
+
+  lsCards[snap.symbol].querySelector('.ls-stop-btn').addEventListener('click', () => {
+    stopLsSession(snap.symbol);
+  });
+}
+
+function removeLsCard(symbol) {
+  if (lsCards[symbol]) {
+    lsCards[symbol].remove();
+    delete lsCards[symbol];
+  }
+  if (Object.keys(lsCards).length === 0) {
+    const sessions = document.getElementById('ls-sessions');
+    const empty = document.createElement('div');
+    empty.className = 'ls-empty';
+    empty.id = 'ls-empty';
+    empty.textContent = 'No active sessions — pick a strategy and click Start';
+    sessions.appendChild(empty);
+  }
+}
+
+async function stopLsSession(symbol) {
+  await fetch('/api/live-strategy/stop', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({symbol}),
+  });
+  removeLsCard(symbol);
+}
+
+document.getElementById('ls-start').addEventListener('click', async () => {
+  const symbols = [...document.querySelectorAll('.ls-sym:checked')].map(el => el.value);
+  if (!symbols.length) { alert('Select at least one symbol'); return; }
+  const interval = document.getElementById('ls-interval').value;
+  await fetch('/api/live-strategy/start', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({symbols, strategy: lsSelected.id, interval}),
+  });
+});
+
+// Update elapsed timers every second
+setInterval(() => {
+  document.querySelectorAll('.ls-elapsed[data-start]').forEach(el => {
+    el.textContent = fmtElapsed(el.dataset.start) + ' running';
+  });
+}, 1000);
+
+// SSE listeners
+es.addEventListener('strategy_tick', e => renderLsCard(JSON.parse(e.data)));
+es.addEventListener('strategy_remove', e => {
+  const d = JSON.parse(e.data);
+  removeLsCard(d.symbol);
+});
+
+// Restore any sessions that were already running (e.g. page reload)
+fetch('/api/live-strategy/sessions')
+  .then(r => r.json())
+  .then(snaps => snaps && snaps.forEach(renderLsCard))
+  .catch(() => {});
+
+buildLsGallery();
 </script>
 </body>
 </html>

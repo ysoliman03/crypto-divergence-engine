@@ -11,6 +11,6 @@ RUN go build -ldflags="-s -w" -o /service ./cmd/${CMD}
 FROM alpine:3.20
 # ca-certificates: required for TLS (wss:// WebSocket connections)
 # tzdata: required for correct UTC time handling
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata python3
 COPY --from=builder /service /service
 ENTRYPOINT ["/service"]
