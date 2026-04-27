@@ -52,11 +52,13 @@ type liveSession struct {
 	shares   float64
 	notional float64
 
-	CurrentPrice float64
-	PnL          float64
-	Trades       int
-	Signal       string
-	StartTime    time.Time
+	CurrentPrice  float64
+	PnL           float64
+	Trades        int
+	Signal        string
+	StartTime     time.Time
+	btcStartPrice float64
+	BTCPnL        float64
 
 	TradeHistory []TradeRecord
 	EquityCurve  []EquityPoint
@@ -84,6 +86,7 @@ type liveSnapshot struct {
 	Signal       string        `json:"signal"`
 	StartTime    time.Time     `json:"startTime"`
 	TotalValue   float64       `json:"totalValue"`
+	BTCPnL       float64       `json:"btcPnl"`
 	TradeHistory []TradeRecord `json:"tradeHistory"`
 	EquityCurve  []EquityPoint `json:"equityCurve"`
 }
@@ -106,6 +109,7 @@ func (s *liveSession) snapshot() liveSnapshot {
 		Signal:       s.Signal,
 		StartTime:    s.StartTime,
 		TotalValue:   s.totalValue(),
+		BTCPnL:       s.BTCPnL,
 		TradeHistory: th,
 		EquityCurve:  ec,
 	}
@@ -224,7 +228,18 @@ func (sm *sessionManager) tick(_ context.Context, sess *liveSession) {
 		sess.mu.Unlock()
 	}
 
+	// Track BTC as benchmark (non-blocking — ignore errors)
+	btcCloses, _ := fetchRecentCloses("BTCUSDT", "1m", 1)
 	sess.mu.Lock()
+	if len(btcCloses) > 0 {
+		btcPrice := btcCloses[0]
+		if sess.btcStartPrice == 0 {
+			sess.btcStartPrice = btcPrice
+		}
+		if sess.btcStartPrice > 0 {
+			sess.BTCPnL = (btcPrice - sess.btcStartPrice) / sess.btcStartPrice * 100
+		}
+	}
 	snap := sess.snapshot()
 	sess.mu.Unlock()
 

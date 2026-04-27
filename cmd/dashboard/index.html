@@ -402,10 +402,17 @@ header {
 .ls-badge.sell  { background: var(--red-bg);   color: var(--red); }
 .ls-badge.hold  { background: var(--surface2); color: var(--muted); }
 
-.ls-pnl { font-size: 34px; font-weight: 700; letter-spacing: -1px; min-width: 140px; text-align: right; }
+.ls-pnl { font-size: 34px; font-weight: 700; letter-spacing: -1px; text-align: right; }
 .ls-pnl.positive { color: var(--green); }
 .ls-pnl.negative { color: var(--red); }
 .ls-pnl.neutral  { color: var(--muted); }
+
+.ls-btc-pnl {
+  font-size: 13px; font-weight: 600; color: var(--amber);
+  text-align: right; white-space: nowrap;
+}
+
+.ls-pnl-group { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 
 .ls-stop-btn {
   background: transparent; border: 1px solid var(--border); border-radius: 8px;
@@ -425,12 +432,12 @@ header {
   border-top: 1px solid var(--border);
   margin: 16px -24px -20px;
   padding: 16px 24px 20px;
-  display: flex; flex-direction: column; gap: 16px;
+  display: flex; flex-direction: row; gap: 20px; align-items: flex-start;
 }
 
-.ls-chart-wrap { position: relative; height: 200px; }
+.ls-chart-wrap { position: relative; flex: 1; height: 240px; min-width: 0; }
 
-.ls-trade-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ls-trade-table { width: 260px; flex-shrink: 0; border-collapse: collapse; font-size: 12px; }
 .ls-trade-table th {
   text-align: left; padding: 6px 10px; font-size: 10px; font-weight: 600;
   color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase;
@@ -1158,7 +1165,10 @@ function renderLsCard(snap) {
         <span class="ls-elapsed" data-start="${snap.startTime}">—</span>
       </div>
     </div>
-    <div class="ls-pnl ${pnlClass}">${pnlText}</div>
+    <div class="ls-pnl-group">
+      <div class="ls-pnl ${pnlClass}">${pnlText}</div>
+      <div class="ls-btc-pnl">BTC ${snap.btcPnl >= 0 ? '+' : ''}${(snap.btcPnl ?? 0).toFixed(2)}%</div>
+    </div>
     <button class="ls-chevron-btn" data-id="${snap.id}">${lsExpanded[snap.id] ? '▲' : '▼'}</button>
     <button class="ls-stop-btn" data-id="${snap.id}">Stop</button>`;
 
