@@ -108,6 +108,38 @@ This is the key data flow for the engine:
 
 Detectors are pluggable: you can add new ones by implementing a simple interface.
 
+## Dashboard
+
+### Live Feed
+
+Real-time price cards for BTC, SOL, and ETH with per-trade volume and side (buy/sell). The alert feed below streams anomaly detections as they fire — volume spikes and order flow imbalances shown here, with the detector name and message for each.
+
+![Live feed](docs/live-feed.png)
+
+### Backtesting — Strategy gallery and code editor
+
+Six built-in strategies to choose from, each with a description, difficulty badge, and the Python implementation loaded into the editor. Selecting any preset populates the editor so you can read or modify the exact logic before running. The custom card lets you write any strategy from scratch with full OHLCV access per bar.
+
+![Backtesting strategy gallery](docs/backtest-editor.png)
+
+### Backtesting — Results
+
+SMA Crossover on BTC-USDT daily bars from early 2023 to mid-2024 returned +100.55% compounded across 34 signals with a 52.9% win rate. The signal table shows every buy and sell with the 5-bar forward return so you can see which individual trades drove the result.
+
+![Backtesting results](docs/backtest-results.png)
+
+### Live Strategy — SMA Crossover on ETH-USDT
+
+SMA Crossover running on ETH-USDT at 1-minute bars over ~7 hours. The strategy finishes at -0.38% while buy-and-hold BTC dropped -1.72% over the same window. The chart shows the strategy going flat early and avoiding most of the decline, while the trade table on the right logs each entry and exit with the cumulative P&L at that moment.
+
+![ETH-USDT SMA Crossover live strategy](docs/live-strategy-eth-sma.png)
+
+### Live Strategy — RSI Mean Reversion on BTC-USDT
+
+RSI Mean Reversion on BTC-USDT at 1-minute bars. Currently holding a long position entered at $79,100. The strategy caught the initial dip and briefly reached +1% before BTC sold off further, pulling the position to -1.12%. BTC buy-and-hold over the same period is -1.68%, so the strategy is still ahead on a relative basis despite the open drawdown.
+
+![BTC-USDT RSI Mean Reversion live strategy](docs/live-strategy-btc-rsi.png)
+
 ## Getting Started
 
 Make sure you have Docker and Docker Compose installed. Then:
