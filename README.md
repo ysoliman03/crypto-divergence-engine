@@ -112,13 +112,13 @@ Detectors are pluggable: you can add new ones by implementing a simple interface
 
 ### Live Feed
 
-Real-time price cards for BTC, SOL, and ETH with per-trade volume and side (buy/sell). The alert feed below streams anomaly detections as they fire — volume spikes and order flow imbalances shown here, with the detector name and message for each.
+Real-time price cards for BTC, SOL, and ETH with per-trade volume and side (buy/sell). The alert feed below streams anomaly detections as they fire. Volume spikes and order flow imbalances are  shown here, with the detector name and message for each.
 
 ![Live feed](docs/live-feed.png)
 
 ### Backtesting — Strategy gallery and code editor
 
-Six built-in strategies to choose from, each with a description, difficulty badge, and the Python implementation loaded into the editor. Selecting any preset populates the editor so you can read or modify the exact logic before running. The custom card lets you write any strategy from scratch with full OHLCV access per bar.
+Built-in strategies to choose from, each with a description, difficulty badge, and the Python implementation loaded into the editor. Selecting any preset pre-fills the editor so you can read or modify the exact logic & dates before running. The custom card lets you write any strategy from scratch with full OHLCV access per bar.
 
 ![Backtesting strategy gallery](docs/backtest-editor.png)
 
@@ -136,7 +136,7 @@ SMA Crossover running on ETH-USDT at 1-minute bars over ~7 hours. The strategy f
 
 ### Live Strategy — RSI Mean Reversion on BTC-USDT
 
-RSI Mean Reversion on BTC-USDT at 1-minute bars. Currently holding a long position entered at $79,100. The strategy caught the initial dip and briefly reached +1% before BTC sold off further, pulling the position to -1.12%. BTC buy-and-hold over the same period is -1.68%, so the strategy is still ahead on a relative basis despite the open drawdown.
+RSI Mean Reversion on BTC-USDT at 1-minute bars. The strategy caught the initial dip and briefly reached +1% before BTC sold off further, pulling the position to -1.12%. BTC buy-and-hold over the same period is -1.68%, so the strategy is still ahead on a relative basis despite the open drawdown.
 
 ![BTC-USDT RSI Mean Reversion live strategy](docs/live-strategy-btc-rsi.png)
 
