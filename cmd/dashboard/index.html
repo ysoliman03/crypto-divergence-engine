@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
@@ -411,6 +413,41 @@ header {
   font-weight: 500; padding: 6px 14px; cursor: pointer; flex-shrink: 0;
 }
 .ls-stop-btn:hover { border-color: var(--red); color: var(--red); }
+
+.ls-chevron-btn {
+  background: transparent; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); font-size: 12px; padding: 6px 10px; cursor: pointer; flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.ls-chevron-btn:hover { border-color: rgba(255,255,255,.3); color: var(--text); }
+
+.ls-expanded {
+  border-top: 1px solid var(--border);
+  margin: 16px -24px -20px;
+  padding: 16px 24px 20px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+.ls-chart-wrap { position: relative; height: 200px; }
+
+.ls-trade-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ls-trade-table th {
+  text-align: left; padding: 6px 10px; font-size: 10px; font-weight: 600;
+  color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.ls-trade-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+.ls-trade-table tr:last-child td { border-bottom: none; }
+.ls-trade-table td.buy  { color: var(--green); font-weight: 600; }
+.ls-trade-table td.sell { color: var(--red);   font-weight: 600; }
+.ls-trade-table td.pos  { color: var(--green); }
+.ls-trade-table td.neg  { color: var(--red);   }
+
+.ls-code-wrap { display: none; }
+.ls-code-wrap.visible { display: block; }
+.ls-code-wrap .bt-editor-toolbar { border-radius: 8px 8px 0 0; }
+.ls-code-wrap .CodeMirror { height: 260px; border-radius: 0 0 8px 8px; }
+.ls-code-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 </style>
 </head>
 <body>
@@ -479,7 +516,7 @@ header {
       <input type="date" id="bt-to">
     </div>
     <div class="bt-field">
-      <label>Forward (bars)</label>
+      <label title="How many bars after a buy signal to measure win rate and correlation. Does not affect strategy return.">Lookahead bars ⓘ</label>
       <input type="number" id="bt-fwd" value="5" min="1" max="90">
     </div>
     <button class="bt-run" id="bt-run">Run Backtest</button>
@@ -563,6 +600,14 @@ header {
       </div>
       <button class="ls-start-btn" id="ls-start">Start Live Strategy</button>
     </div>
+  </div>
+
+  <div class="ls-code-wrap" id="ls-code-wrap">
+    <div class="bt-editor-toolbar">
+      <span>strategy.py</span>
+      <span>on_bar(i, closes, opens, highs, lows, volumes, dates, position, memory) → "buy" | "sell" | None</span>
+    </div>
+    <textarea id="ls-code"></textarea>
   </div>
 
   <div class="ls-sessions-header">Active Sessions</div>
@@ -1015,9 +1060,14 @@ function renderBacktest(data, fwdDays) {
 
 // ── Live Strategy ──────────────────────────────────────────────────────────
 
-const LS_STRATEGIES = STRATEGIES.filter(s => s.id !== 'custom');
-let lsSelected = LS_STRATEGIES[0];
-const lsCards = {}; // symbol → DOM element
+const LS_STRATEGIES = STRATEGIES; // includes custom
+let lsSelected = LS_STRATEGIES[1]; // default: SMA Crossover
+let lsCodeEditor = null;
+let lsCodeEditorReady = false;
+
+const lsSnapshots = {};   // id → latest snapshot
+const lsCharts    = {};   // id → Chart instance
+const lsExpanded  = {};   // id → bool
 
 function buildLsGallery() {
   const grid = document.getElementById('ls-gallery');
@@ -1032,10 +1082,32 @@ function buildLsGallery() {
       lsSelected = s;
       document.querySelectorAll('.ls-strategy-option').forEach(o =>
         o.classList.toggle('active', o.dataset.id === s.id));
+      const wrap = document.getElementById('ls-code-wrap');
+      wrap.classList.toggle('visible', s.id === 'custom');
+      if (s.id === 'custom') initLsEditor();
     });
     grid.appendChild(el);
   });
 }
+
+function initLsEditor() {
+  if (lsCodeEditorReady) return;
+  lsCodeEditorReady = true;
+  lsCodeEditor = CodeMirror.fromTextArea(document.getElementById('ls-code'), {
+    mode: 'python', theme: 'dracula', lineNumbers: true,
+    indentUnit: 4, tabSize: 4, indentWithTabs: false,
+  });
+  lsCodeEditor.setValue(STRATEGY_CODE['custom'] || '');
+}
+
+// Lazily init live editor when Live Strategy tab is opened
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  if (btn.dataset.tab === 'live-strategy') {
+    btn.addEventListener('click', () => {
+      if (lsSelected.id === 'custom') initLsEditor();
+    });
+  }
+});
 
 function fmtPrice(p) {
   return p.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -1050,23 +1122,32 @@ function fmtElapsed(startIso) {
   return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
 }
 
+function fmtTime(ms) {
+  return new Date(ms).toLocaleTimeString('en-GB', {hour12: false});
+}
+
+function getStratName(id) {
+  return LS_STRATEGIES.find(s => s.id === id)?.name ?? id;
+}
+
 function renderLsCard(snap) {
-  const sessions = document.getElementById('ls-sessions');
+  lsSnapshots[snap.id] = snap;
   document.getElementById('ls-empty')?.remove();
 
+  const sessions = document.getElementById('ls-sessions');
   const pnl      = snap.pnl;
-  const pnlClass = pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : 'neutral';
+  const pnlClass = pnl > 0.001 ? 'positive' : pnl < -0.001 ? 'negative' : 'neutral';
   const pnlText  = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '%';
-  const stratName = LS_STRATEGIES.find(s => s.id === snap.strategy)?.name ?? snap.strategy;
+  const stratName = getStratName(snap.strategy);
+  const symLabel  = snap.symbol.includes('-') ? snap.symbol : snap.symbol.replace('USDT', '-USDT');
 
   let entryDetail = snap.position === 'long'
-    ? `Entry $${fmtPrice(snap.entryPrice)} &middot; `
-    : '';
+    ? `Entry $${fmtPrice(snap.entryPrice)} &middot; ` : '';
 
-  const inner = `
+  const headerHTML = `
     <div class="ls-card-info">
       <div class="ls-card-top">
-        <span class="ls-card-symbol">${snap.symbol.replace('USDT','-USDT')}</span>
+        <span class="ls-card-symbol">${symLabel}</span>
         <span class="ls-badge ${snap.position}">${snap.position.toUpperCase()}</span>
         <span class="ls-badge ${snap.signal}">${snap.signal.toUpperCase()}</span>
       </div>
@@ -1078,74 +1159,223 @@ function renderLsCard(snap) {
       </div>
     </div>
     <div class="ls-pnl ${pnlClass}">${pnlText}</div>
-    <button class="ls-stop-btn" data-sym="${snap.symbol}">Stop</button>`;
+    <button class="ls-chevron-btn" data-id="${snap.id}">${lsExpanded[snap.id] ? '▲' : '▼'}</button>
+    <button class="ls-stop-btn" data-id="${snap.id}">Stop</button>`;
 
-  if (lsCards[snap.symbol]) {
-    lsCards[snap.symbol].innerHTML = inner;
-  } else {
-    const card = document.createElement('div');
+  let card = document.getElementById('ls-card-' + snap.id);
+  if (!card) {
+    card = document.createElement('div');
     card.className = 'ls-card';
-    card.id = 'ls-card-' + snap.symbol;
-    card.innerHTML = inner;
+    card.id = 'ls-card-' + snap.id;
+    card.style.flexDirection = 'column';
     sessions.appendChild(card);
-    lsCards[snap.symbol] = card;
   }
 
-  lsCards[snap.symbol].querySelector('.ls-stop-btn').addEventListener('click', () => {
-    stopLsSession(snap.symbol);
+  // Preserve expanded section if it exists
+  const existingExpanded = card.querySelector('.ls-expanded');
+  card.innerHTML = `<div class="ls-card-header-row" style="display:flex;align-items:center;gap:24px;">${headerHTML}</div>`;
+  if (existingExpanded) card.appendChild(existingExpanded);
+
+  card.querySelector('.ls-chevron-btn').addEventListener('click', () => toggleExpand(snap.id));
+  card.querySelector('.ls-stop-btn').addEventListener('click', () => stopLsSession(snap.id));
+
+  // If expanded, update the chart and trade table
+  if (lsExpanded[snap.id]) {
+    updateExpandedSection(snap.id);
+  }
+}
+
+function toggleExpand(id) {
+  lsExpanded[id] = !lsExpanded[id];
+  const snap = lsSnapshots[id];
+  if (!snap) return;
+
+  const card = document.getElementById('ls-card-' + id);
+  if (!card) return;
+
+  const chevron = card.querySelector('.ls-chevron-btn');
+  if (chevron) chevron.textContent = lsExpanded[id] ? '▲' : '▼';
+
+  if (lsExpanded[id]) {
+    let exp = card.querySelector('.ls-expanded');
+    if (!exp) {
+      exp = document.createElement('div');
+      exp.className = 'ls-expanded';
+      exp.innerHTML = `
+        <div class="ls-chart-wrap"><canvas id="ls-chart-${id}"></canvas></div>
+        <table class="ls-trade-table">
+          <thead><tr><th>Time</th><th>Type</th><th>Price</th><th>Cum. P&L</th></tr></thead>
+          <tbody id="ls-trades-${id}"></tbody>
+        </table>`;
+      card.appendChild(exp);
+    }
+    updateExpandedSection(id);
+  } else {
+    const exp = card.querySelector('.ls-expanded');
+    if (exp) exp.remove();
+    if (lsCharts[id]) { lsCharts[id].destroy(); delete lsCharts[id]; }
+  }
+}
+
+function updateExpandedSection(id) {
+  const snap = lsSnapshots[id];
+  if (!snap) return;
+
+  // Trade table
+  const tbody = document.getElementById('ls-trades-' + id);
+  if (tbody) {
+    if (!snap.tradeHistory || snap.tradeHistory.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">No trades yet</td></tr>';
+    } else {
+      tbody.innerHTML = [...snap.tradeHistory].reverse().map(t => {
+        const pnlClass = t.pnl >= 0 ? 'pos' : 'neg';
+        return `<tr>
+          <td>${fmtTime(t.t)}</td>
+          <td class="${t.kind}">${t.kind.toUpperCase()}</td>
+          <td>$${fmtPrice(t.price)}</td>
+          <td class="${pnlClass}">${t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(2)}%</td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // Chart
+  renderLsChart(id, snap);
+}
+
+async function renderLsChart(id, snap) {
+  const canvas = document.getElementById('ls-chart-' + id);
+  if (!canvas) return;
+
+  // Fetch BTC comparison data
+  const startMs = new Date(snap.startTime).getTime();
+  let btcPoints = [];
+  try {
+    const r = await fetch(`/api/live-btc?from=${startMs}&interval=${snap.interval}`);
+    btcPoints = await r.json();
+  } catch(e) {}
+
+  if (lsCharts[id]) {
+    lsCharts[id].destroy();
+    delete lsCharts[id];
+  }
+
+  const equityCurve = snap.equityCurve || [];
+
+  lsCharts[id] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: getStratName(snap.strategy),
+          data: equityCurve.map(p => ({x: p.t, y: p.v})),
+          borderColor: '#ffffff',
+          backgroundColor: 'rgba(255,255,255,0.05)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.2,
+          fill: true,
+        },
+        {
+          label: 'BTC benchmark',
+          data: btcPoints.map(p => ({x: p.t, y: p.v})),
+          borderColor: '#f59e0b',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.2,
+          borderDash: [4, 4],
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: {
+          labels: { color: '#888888', font: {family: 'Inter', size: 11}, boxWidth: 20 },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toFixed(2)}%`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { tooltipFormat: 'HH:mm', displayFormats: {minute: 'HH:mm', hour: 'HH:mm'} },
+          ticks: { color: '#888888', font: {family: 'Inter', size: 10}, maxTicksLimit: 8 },
+          grid: { color: '#2a2a2a' },
+        },
+        y: {
+          ticks: {
+            color: '#888888', font: {family: 'Inter', size: 10},
+            callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%',
+          },
+          grid: { color: '#2a2a2a' },
+        },
+      },
+    },
   });
 }
 
-function removeLsCard(symbol) {
-  if (lsCards[symbol]) {
-    lsCards[symbol].remove();
-    delete lsCards[symbol];
-  }
-  if (Object.keys(lsCards).length === 0) {
+function removeLsCard(id) {
+  if (lsCharts[id]) { lsCharts[id].destroy(); delete lsCharts[id]; }
+  delete lsSnapshots[id];
+  delete lsExpanded[id];
+  document.getElementById('ls-card-' + id)?.remove();
+  if (Object.keys(lsSnapshots).length === 0) {
     const sessions = document.getElementById('ls-sessions');
-    const empty = document.createElement('div');
-    empty.className = 'ls-empty';
-    empty.id = 'ls-empty';
-    empty.textContent = 'No active sessions — pick a strategy and click Start';
-    sessions.appendChild(empty);
+    if (!document.getElementById('ls-empty')) {
+      const empty = document.createElement('div');
+      empty.className = 'ls-empty'; empty.id = 'ls-empty';
+      empty.textContent = 'No active sessions — pick a strategy and click Start';
+      sessions.appendChild(empty);
+    }
   }
 }
 
-async function stopLsSession(symbol) {
+async function stopLsSession(id) {
   await fetch('/api/live-strategy/stop', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({symbol}),
+    body: JSON.stringify({id}),
   });
-  removeLsCard(symbol);
+  removeLsCard(id);
 }
 
 document.getElementById('ls-start').addEventListener('click', async () => {
   const symbols = [...document.querySelectorAll('.ls-sym:checked')].map(el => el.value);
   if (!symbols.length) { alert('Select at least one symbol'); return; }
   const interval = document.getElementById('ls-interval').value;
+  const code = lsCodeEditor ? lsCodeEditor.getValue() : '';
   await fetch('/api/live-strategy/start', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({symbols, strategy: lsSelected.id, interval}),
+    body: JSON.stringify({symbols, strategy: lsSelected.id, interval, code}),
   });
 });
 
-// Update elapsed timers every second
+// Update elapsed timers and refresh expanded charts every 30s
 setInterval(() => {
   document.querySelectorAll('.ls-elapsed[data-start]').forEach(el => {
     el.textContent = fmtElapsed(el.dataset.start) + ' running';
   });
 }, 1000);
 
+setInterval(() => {
+  Object.keys(lsExpanded).forEach(id => {
+    if (lsExpanded[id] && lsSnapshots[id]) renderLsChart(id, lsSnapshots[id]);
+  });
+}, 30000);
+
 // SSE listeners
 es.addEventListener('strategy_tick', e => renderLsCard(JSON.parse(e.data)));
-es.addEventListener('strategy_remove', e => {
-  const d = JSON.parse(e.data);
-  removeLsCard(d.symbol);
-});
+es.addEventListener('strategy_remove', e => { const d = JSON.parse(e.data); removeLsCard(d.id); });
 
-// Restore any sessions that were already running (e.g. page reload)
+// Restore sessions on page reload
 fetch('/api/live-strategy/sessions')
   .then(r => r.json())
   .then(snaps => snaps && snaps.forEach(renderLsCard))

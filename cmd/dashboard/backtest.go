@@ -519,7 +519,7 @@ try:
             position = 0
             events.append({'barIdx': i, 'date': dates[i], 'price': closes[i], 'kind': 'sell'})
 
-    sys.stdout.write(json.dumps({'events': events}))
+    sys.stdout.write(json.dumps({'events': events, 'final_position': position}))
 
 except Exception:
     sys.stdout.write(json.dumps({'error': traceback.format_exc()}))

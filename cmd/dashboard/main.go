@@ -85,6 +85,7 @@ func main() {
 	mux.HandleFunc("/api/live-strategy/start", sm.handleStart)
 	mux.HandleFunc("/api/live-strategy/stop", sm.handleStop)
 	mux.HandleFunc("/api/live-strategy/sessions", sm.handleList)
+	mux.HandleFunc("/api/live-btc", handleLiveBTC)
 
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {
